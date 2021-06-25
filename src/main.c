@@ -77,14 +77,14 @@ int main(int argc, char **argv)
 	char *socket_path = "/var/run/nscd/socket";
 	char *config_path = "/etc/nsswitch.conf";
 	char *pid_path = 0;
-	bool daemonize = false;
+	bool daemonize = false, cache = false;
 	int c;
 
 	signal(SIGPIPE, SIG_IGN);
 
 	init_program_invocation_name(argv[0]);
 
-	while((c = getopt(argc, argv, "c:s:p:d")) != -1) switch(c) {
+	while((c = getopt(argc, argv, "c:s:p:dC::")) != -1) switch(c) {
 	case 'c':
 		config_path = optarg;
 		break;
@@ -96,6 +96,9 @@ int main(int argc, char **argv)
 		break;
 	case 'd':
 		daemonize = true;
+		break;
+	case 'C':
+		cache = true;
 		break;
 	default:
 		return 1;
@@ -112,6 +115,24 @@ int main(int argc, char **argv)
 	fclose(yyin);
 
 	link_t *entry_l, *service_l;
+
+	if(cache) {
+		const action on_status[4] = {ACT_CONTINUE, ACT_CONTINUE, ACT_CONTINUE, ACT_CONTINUE};
+		struct mod_passwd *modp = malloc(sizeof(*modp));
+		struct mod_group *modg = malloc(sizeof(*modg));
+		if (!modp || !modg) die();
+
+		modp->nss_getpwnam_r = cache_getpwnam_r;
+		modp->nss_getpwuid_r = cache_getpwuid_r;
+		memcpy(modp->on_status, on_status, sizeof(modp->on_status));
+		list_push_back(&passwd_mods, &modp->link);
+
+		modg->nss_getgrnam_r = cache_getgrnam_r;
+		modg->nss_getgrgid_r = cache_getgrgid_r;
+		modg->nss_initgroups_dyn = cache_initgroups_dyn;
+		memcpy(modg->on_status, on_status, sizeof(modg->on_status));
+		list_push_back(&group_mods, &modg->link);
+	}
 
 	entry_l = list_head(&parsed_output);
 	while(entry_l) {

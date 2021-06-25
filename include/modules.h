@@ -31,4 +31,10 @@ struct mod_passwd {
 extern list_t passwd_mods;
 extern list_t group_mods;
 
+enum nss_status cache_getpwnam_r(const char *, struct passwd *, char *, size_t, int *);
+enum nss_status cache_getpwuid_r(uid_t, struct passwd *, char *, size_t, int *);
+enum nss_status cache_getgrnam_r(const char *, struct group *, char *, size_t, int *);
+enum nss_status cache_getgrgid_r(gid_t, struct group *, char *, size_t, int *);
+enum nss_status cache_initgroups_dyn(const char *, gid_t, long *, long *, gid_t **, long , int *);
+
 #endif
