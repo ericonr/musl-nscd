@@ -118,22 +118,6 @@ int main(int argc, char **argv)
 
 	if(cache) {
 		if(init_caches()) die();
-
-		const action on_status[4] = {ACT_CONTINUE, ACT_CONTINUE, ACT_CONTINUE, ACT_CONTINUE};
-		struct mod_passwd *modp = malloc(sizeof(*modp));
-		struct mod_group *modg = malloc(sizeof(*modg));
-		if (!modp || !modg) die();
-
-		modp->nss_getpwnam_r = cache_getpwnam_r;
-		modp->nss_getpwuid_r = cache_getpwuid_r;
-		memcpy(modp->on_status, on_status, sizeof(modp->on_status));
-		list_push_back(&passwd_mods, &modp->link);
-
-		modg->nss_getgrnam_r = cache_getgrnam_r;
-		modg->nss_getgrgid_r = cache_getgrgid_r;
-		modg->nss_initgroups_dyn = cache_initgroups_dyn;
-		memcpy(modg->on_status, on_status, sizeof(modg->on_status));
-		list_push_back(&group_mods, &modg->link);
 	}
 
 	entry_l = list_head(&parsed_output);

@@ -1,3 +1,4 @@
+#include <string.h>
 #include <stdlib.h>
 #include <pthread.h>
 
@@ -57,10 +58,18 @@ enum nss_status cache_initgroups_dyn(const char *a, gid_t b, long *c, long *d, g
 	return NSS_STATUS_NOTFOUND;
 }
 
+struct mod_passwd cache_modp = { .nss_getpwnam_r = cache_getpwnam_r, .nss_getpwuid_r = cache_getpwuid_r };
+struct mod_group cache_modg =
+	{ .nss_getgrnam_r = cache_getgrnam_r, .nss_getgrgid_r = cache_getgrgid_r, .nss_initgroups_dyn = cache_initgroups_dyn };
+
 int init_caches(void)
 {
 	//if(pthread_rwlock_init(&pwuid_cache.lock, 0)) return -1;
 	if(!(pwuid_cache.res = malloc(pwuid_cache.size * sizeof(*pwuid_cache.res)))) return -1;
+
+	const action on_status[4] = {ACT_RETURN, ACT_CONTINUE, ACT_RETURN, ACT_RETURN};
+	memcpy(cache_modp.on_status, on_status, sizeof(on_status));
+	memcpy(cache_modg.on_status, on_status, sizeof(on_status));
 
 	return 0;
 }
