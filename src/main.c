@@ -117,6 +117,8 @@ int main(int argc, char **argv)
 	link_t *entry_l, *service_l;
 
 	if(cache) {
+		if(init_caches()) die();
+
 		const action on_status[4] = {ACT_CONTINUE, ACT_CONTINUE, ACT_CONTINUE, ACT_CONTINUE};
 		struct mod_passwd *modp = malloc(sizeof(*modp));
 		struct mod_group *modg = malloc(sizeof(*modg));
