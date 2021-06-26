@@ -16,9 +16,9 @@ enum nss_status cache_getpwnam_r(const char *a, struct passwd *b, char *c, size_
 }
 
 struct pwuid_result {
-	uid_t id;
 	struct passwd *p;
 	char *b;
+	/* we don't handle cases where the action isn't ACT_RETURN (ACT_CONTINUE and/or ACT_MERGE?) */
 };
 /* a LRU cache is probably the best option? */
 struct pwuid_cache {
@@ -36,11 +36,9 @@ enum nss_status cache_getpwuid_r(uid_t id, struct passwd *p, char *a, size_t b, 
 	enum nss_status ret = NSS_STATUS_NOTFOUND;
 	pthread_rwlock_rdlock(&pwuid_cache.lock);
 	for(size_t i = 0; i < pwuid_cache.len; i++) {
-		if (pwuid_cache.res[i].id == id) {
-			/* TODO: implement passwd copy -
-			 * alternatively, implement cache awareness so we can just memcpy one
-			 * passwd into another and track the buffer appropriately;
-			 * we will need some level of cache awareness anyway to deal with *storing* values into the cache */
+		if (pwuid_cache.res[i].p->pw_uid == id) {
+			puts("match cache");
+			memcpy(p, pwuid_cache.res[i].p, sizeof(*p));
 			ret = NSS_STATUS_SUCCESS;
 			goto cleanup;
 		}
