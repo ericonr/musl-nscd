@@ -48,6 +48,36 @@ cleanup:
 	return ret;
 }
 
+/* this function copies the passwd struct p points to and
+ * takes ownership of the buffer b points to */
+int cache_passwd_add(struct passwd *p, char *b)
+{
+	int ret = 0;
+	IS_CACHING_FOR_WRITE
+
+	/* studying the effects of contention on this lock might be important */
+	pthread_rwlock_wrlock(&pwuid_cache.lock);
+
+	/* TODO: we should check in the critical session if the new value hasn't been
+	 * added by another thread */
+
+	/* malloc could be moved to outside the lock, but it's a micro optimization */
+	struct passwd *copy = malloc(sizeof(*copy));
+	if(!copy) {
+		ret = -1;
+		goto cleanup;
+	}
+	memcpy(copy, p, sizeof(*copy));
+
+	struct pwuid_result *e = &pwuid_cache.res[pwuid_cache.len++];
+	e->p = copy;
+	e->b = b;
+
+cleanup:
+	pthread_rwlock_unlock(&pwuid_cache.lock);
+	return 0;
+}
+
 enum nss_status cache_getgrnam_r(const char *a, struct group *b, char *c, size_t d, int *err)
 {
 	IS_CACHING
