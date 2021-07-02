@@ -283,42 +283,61 @@ int return_result(int fd, int swap, uint32_t reqtype, void *key)
 		struct initgroups_res l;
 	} res;
 	link_t *l;
-	struct mod_group *mod_group;
-	struct mod_passwd *mod_passwd;
-	char *buf = 0;
-	size_t buf_len = 0;
-	long tmp;
 	bool using_passwd;
+	bool cache_run = true;
 
 	if(ISPWREQ(reqtype)) {
 		using_passwd = true;
-		l = list_head(&passwd_mods);
-		tmp = sysconf(_SC_GETPW_R_SIZE_MAX);
-		if(tmp < 0) buf_len = 4096;
-		else buf_len = tmp;
-		buf = malloc(buf_len);
-		if(!buf) return -1;
 	} else {
 		using_passwd = false;
-		l = list_head(&group_mods);
-		tmp = sysconf(_SC_GETGR_R_SIZE_MAX);
-		if(tmp < 0) buf_len = 4096;
-		else buf_len = tmp;
-		buf = malloc(buf_len);
-		if(!buf) return -1;
 	}
-	for(; l; l = list_next(l)) {
+	do {
 		int ret = 0;
 		int act;
 		enum nss_status status;
 		action *on_status;
-		if(using_passwd) {
-			mod_passwd = list_ref(l, struct mod_passwd, link);
-			mod_group = 0;
+		struct mod_group *mod_group;
+		struct mod_passwd *mod_passwd;
+		char *buf = 0;
+		size_t buf_len = 0;
+
+		if (cache_run) {
+			/* the cache module is the first to run */
+			cache_run = false;
+			mod_passwd = &cache_modp;
+			mod_group = &cache_modg;
+
+			/* we ready the list head for the next iteration of the loop */
+			if(using_passwd) {
+				l = list_head(&passwd_mods);
+			} else {
+				l = list_head(&group_mods);
+			}
 		} else {
-			mod_group = list_ref(l, struct mod_group, link);
-			mod_passwd = 0;
+			/* all iterations after the first one will run the code here */
+			if(using_passwd) {
+				buf_len = buf_len_passwd;
+
+				mod_passwd = list_ref(l, struct mod_passwd, link);
+				mod_group = 0;
+			} else {
+				buf_len = buf_len_group;
+
+				mod_group = list_ref(l, struct mod_group, link);
+				mod_passwd = 0;
+			}
+			/* if it's 0, we will exit the loop after trying the current
+			 * mod_passwd or mod_group */
+			l = list_next(l);
+
+			/* the first run after the cache one will allocate the buffer used for
+			 * struct group and struct passwd */
+			if(!buf) {
+				buf = malloc(buf_len);
+				if(!buf) return -1;
+			}
 		}
+
 		do {
 			memset(&res, 0, sizeof(res));
 			status = nss_getkey(reqtype, mod_passwd, mod_group, key, &res, buf, buf_len, &ret);
@@ -385,9 +404,8 @@ int return_result(int fd, int swap, uint32_t reqtype, void *key)
 				continue;
 			}
 		}
-	}
+	} while(l);
 	if(!l) {
-		free(buf);
 		switch(reqtype) {
 		case GETPWBYNAME: case GETPWBYUID:
 			return write_pwd(fd, swap, 0) > 0 ? 0 : -1;
