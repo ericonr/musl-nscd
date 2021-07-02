@@ -427,7 +427,10 @@ int return_result(int fd, int swap, uint32_t reqtype, void *key)
 					cache_passwd_add(&res.p, buf);
 					buf = 0;
 				}
-				else if(ISGRPREQ(reqtype)) {}
+				else if(ISGRPREQ(reqtype)) {
+					cache_group_add(&res.g, buf);
+					buf = 0;
+				}
 				else {}
 			}
 			/* even when all caches are implemented, we have to free(buf)
