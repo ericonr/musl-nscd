@@ -39,6 +39,38 @@ static bool validate_timestamp(time_t t)
 	return compare_timestamps(t, monotonic_seconds());
 }
 
+/* increment len and store the index for that new member in index */
+static bool cache_increment_len(size_t *len, size_t *size, size_t sizeof_element, void **data, size_t *index)
+{
+	/* first simply try to increment len */
+	if(*len < *size) {
+		*index = (*len)++;
+		return true;
+	}
+
+	/* otherwise, try to increase cache size */
+
+	if(*size >= CACHE_MAX_ENTRIES)
+		return false;
+
+	size_t new_size;
+	/* memory growth factor is 1.5x; see socket_handle.c for a similar impl */
+	if(*size > CACHE_MAX_ENTRIES - *size/2)
+		new_size = CACHE_MAX_ENTRIES;
+	else
+		new_size = *size + *size/2;
+
+	/* XXX: doesn't check for multiplication overflow */
+	void *tmp = realloc(*data, new_size * sizeof_element);
+	if(!tmp)
+		return false;
+
+	*size = new_size;
+	*data = tmp;
+	*index = (*len)++;
+	return true;
+}
+
 struct passwd_result {
 	struct passwd *p;
 	char *b;
@@ -70,38 +102,6 @@ enum nss_status cache_getpwuid_r(uid_t id, struct passwd *p, char *buf, size_t b
 	#define COMPARISON() (res->p->pw_uid == id)
 	#define ARGUMENT p
 	#include "cache_query.h"
-}
-
-/* increment len and store the index for that new member in index */
-static bool cache_increment_len(size_t *len, size_t *size, size_t sizeof_element, void **data, size_t *index)
-{
-	/* first simply try to increment len */
-	if(*len < *size) {
-		*index = (*len)++;
-		return true;
-	}
-
-	/* otherwise, try to increase cache size */
-
-	if(*size >= CACHE_MAX_ENTRIES)
-		return false;
-
-	size_t new_size;
-	/* memory growth factor is 1.5x; see socket_handle.c for a similar impl */
-	if(*size > CACHE_MAX_ENTRIES - *size/2)
-		new_size = CACHE_MAX_ENTRIES;
-	else
-		new_size = *size + *size/2;
-
-	/* XXX: doesn't check for multiplication overflow */
-	void *tmp = realloc(*data, new_size * sizeof_element);
-	if(!tmp)
-		return false;
-
-	*size = new_size;
-	*data = tmp;
-	*index = (*len)++;
-	return true;
 }
 
 /* this function copies the passwd struct p points to and
