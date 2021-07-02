@@ -8,7 +8,7 @@
 
 static int cache = 0;
 #define IS_CACHING if(!cache) { *err = 0; return NSS_STATUS_UNAVAIL; }
-#define IS_CACHING_FOR_WRITE if(!cache) { return -1; }
+#define IS_CACHING_FOR_WRITE(storage_buffer) if(!cache) { free(storage_buffer); return -1; }
 
 /* 10 minutes, stored as seconds */
 #define CACHE_INVALIDATION_TIME (10 * 60)
@@ -118,7 +118,7 @@ bool cache_passwd_increment_len(struct passwd_cache *cache, size_t *index)
  * takes ownership of the buffer b points to */
 int cache_passwd_add(struct passwd *p, char *b)
 {
-	IS_CACHING_FOR_WRITE
+	IS_CACHING_FOR_WRITE(b);
 
 	int ret = 0;
 	/* variables for dealing with duplicates */
