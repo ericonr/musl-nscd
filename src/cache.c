@@ -198,19 +198,17 @@ enum nss_status cache_initgroups_dyn(const char *a, gid_t b, long *c, long *d, g
 	return NSS_STATUS_NOTFOUND;
 }
 
-struct mod_passwd cache_modp = { .nss_getpwnam_r = cache_getpwnam_r, .nss_getpwuid_r = cache_getpwuid_r };
+#define CACHE_ON_STATUS {ACT_RETURN, ACT_CONTINUE, ACT_CONTINUE, ACT_CONTINUE}
+struct mod_passwd cache_modp =
+	{ .nss_getpwnam_r = cache_getpwnam_r, .nss_getpwuid_r = cache_getpwuid_r, .on_status = CACHE_ON_STATUS };
 struct mod_group cache_modg =
-	{ .nss_getgrnam_r = cache_getgrnam_r, .nss_getgrgid_r = cache_getgrgid_r, .nss_initgroups_dyn = cache_initgroups_dyn };
+	{ .nss_getgrnam_r = cache_getgrnam_r, .nss_getgrgid_r = cache_getgrgid_r,
+	  .nss_initgroups_dyn = cache_initgroups_dyn, .on_status = CACHE_ON_STATUS };
 
 int init_caches(void)
 {
 	if(!(passwd_cache.res = malloc(passwd_cache.size * sizeof(*passwd_cache.res)))) return -1;
 
-	const action on_status[4] = {ACT_RETURN, ACT_CONTINUE, ACT_RETURN, ACT_RETURN};
-	memcpy(cache_modp.on_status, on_status, sizeof(on_status));
-	memcpy(cache_modg.on_status, on_status, sizeof(on_status));
-
 	cache = 1;
-
 	return 0;
 }
