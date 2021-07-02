@@ -316,13 +316,9 @@ int return_result(int fd, int swap, uint32_t reqtype, void *key)
 		} else {
 			/* all iterations after the first one will run the code here */
 			if(using_passwd) {
-				buf_len = buf_len_passwd;
-
 				mod_passwd = list_ref(l, struct mod_passwd, link);
 				mod_group = 0;
 			} else {
-				buf_len = buf_len_group;
-
 				mod_group = list_ref(l, struct mod_group, link);
 				mod_passwd = 0;
 			}
@@ -330,11 +326,20 @@ int return_result(int fd, int swap, uint32_t reqtype, void *key)
 			 * mod_passwd or mod_group */
 			l = list_next(l);
 
-			/* the first run after the cache one will allocate the buffer used for
-			 * struct group and struct passwd */
-			if(!buf) {
-				buf = malloc(buf_len);
-				if(!buf) return -1;
+			/* GETINITGR doesn't use buf */
+			if(ISPWREQ(reqtype) || ISGRPREQ(reqtype)) {
+				if(ISPWREQ(reqtype)) {
+					buf_len = buf_len_passwd;
+				} else if(ISGRPREQ(reqtype)) {
+					buf_len = buf_len_group;
+				}
+
+				/* the first run after the cache one will allocate the buffer used for
+				 * struct group and struct passwd */
+				if(!buf) {
+					buf = malloc(buf_len);
+					if(!buf) return -1;
+				}
 			}
 		}
 
