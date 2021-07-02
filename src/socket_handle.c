@@ -379,11 +379,13 @@ int return_result(int fd, int swap, uint32_t reqtype, void *key)
 			STS_SUCCESS];
 		if(act == ACT_RETURN) {
 			int err;
-			if(mod_passwd)
+			/* the write_* functions also validate the entry, and will return -2
+			 * in case it's invalid (basically, if it can't be sent via the nscd protocol) */
+			if(ISPWREQ(reqtype)) {
 				err = write_pwd(fd, swap, status == NSS_STATUS_SUCCESS ? &res.p : 0);
-			else if(reqtype != GETINITGR)
+			} else if(ISGRPREQ(reqtype)) {
 				err = write_grp(fd, swap, status == NSS_STATUS_SUCCESS ? &res.g : 0);
-			else {
+			} else {
 				err = write_groups(fd, swap, status == NSS_STATUS_SUCCESS ? res.l.end : 0, status == NSS_STATUS_SUCCESS ? res.l.grps : 0);
 				free(res.l.grps);
 			}
