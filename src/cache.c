@@ -108,68 +108,13 @@ enum nss_status cache_getpwuid_r(uid_t id, struct passwd *p, char *buf, size_t b
  * takes ownership of the buffer b points to */
 int cache_passwd_add(struct passwd *p, char *b)
 {
-	IS_CACHING_FOR_WRITE(b);
-
-	int ret = 0;
-	/* variables for dealing with duplicates */
-	size_t i;
-	bool found_outdated = false;
-
-	/* studying the effects of contention on this lock might be important */
-	pthread_rwlock_wrlock(&passwd_cache.lock);
-
-	/* check if the new value hasn't been added by another thread */
-	for(i = 0; i < passwd_cache.len; i++) {
-		struct passwd_result *res = &passwd_cache.res[i];
-		/* since the UID is canonical, we only need to look for it to check for duplicates */
-		if (res->p->pw_uid == p->pw_uid) {
-			/* valid entry */
-			if(validate_timestamp(res->t)) {
-				goto cleanup;
-			}
-			/* outdated entry, should be replaced */
-			found_outdated = true;
-			break;
-		}
-	}
-
-	/* if we are here, we are necessarily going to add something to the cache */
-	struct passwd_result *res;;
-	if(found_outdated) {
-		res = &passwd_cache.res[i];
-
-		/* we can re-use the cache entry's passwd struct */
-		memcpy(res->p, p, sizeof(*p));
-		/* but we still need to free its underlying storage */
-		free(res->b);
-	} else {
-		/* TODO: if resizing fails, we can scan the cache for an outdated
-		 * entry and overwrite it */
-		void *tmp_pointer = passwd_cache.res;
-		if(!cache_increment_len(&passwd_cache.len, &passwd_cache.size, sizeof(*passwd_cache.res), &tmp_pointer, &i))
-			goto cleanup;
-		passwd_cache.res = tmp_pointer;
-
-		res = &passwd_cache.res[i];
-
-		struct passwd *copy = malloc(sizeof(*copy));
-		if(!copy) {
-			ret = -1;
-			goto cleanup;
-		}
-		memcpy(copy, p, sizeof(*p));
-
-		res->p = copy;
-	}
-	res->b = b;
-	b = 0;
-	res->t = monotonic_seconds();
-
-cleanup:
-	/* if insertion fails, we should free the buffer */
-	free(b);
-	pthread_rwlock_unlock(&passwd_cache.lock);
-	return ret;
+	#define BUFFER b
+	#define CACHE passwd_cache
+	#define RESULT_TYPE passwd_result
+	#define DATA_TYPE struct passwd
+	#define COMPARISON() (res->p->pw_uid == p->pw_uid)
+	#define ARGUMENT p
+	#include "cache_add.h"
 }
 
 struct group_result {
@@ -209,72 +154,13 @@ enum nss_status cache_getgrgid_r(gid_t id, struct group *g, char *buf, size_t bu
  * takes ownership of the buffer b points to */
 int cache_group_add(struct group *g, char *b)
 {
-	IS_CACHING_FOR_WRITE(b);
-
-	int ret = 0;
-	/* variables for dealing with duplicates */
-	size_t i;
-	bool found_outdated = false;
-
-	/* studying the effects of contention on this lock might be important */
-	pthread_rwlock_wrlock(&group_cache.lock);
-
-	/* TODO: store the index for the oldest entry, use it if we don't replace
-	 * an old one of our own */
-
-	/* check if the new value hasn't been added by another thread */
-	for(i = 0; i < group_cache.len; i++) {
-		struct group_result *res = &group_cache.res[i];
-		/* since the GID is canonical, we only need to look for it to check for duplicates */
-		if (res->g->gr_gid == g->gr_gid) {
-			/* valid entry */
-			if(validate_timestamp(res->t)) {
-				goto cleanup;
-			}
-			/* outdated entry, should be replaced */
-			found_outdated = true;
-			break;
-		}
-	}
-
-	/* if we are here, we are necessarily going to add something to the cache */
-	struct group_result *res;;
-	if(found_outdated) {
-		res = &group_cache.res[i];
-
-		/* we can re-use the cache entry's group struct */
-		memcpy(res->g, g, sizeof(*g));
-		/* but we still need to free its underlying storage */
-		free(res->b);
-	} else {
-		/* TODO: if resizing fails, we can scan the cache for an outdated
-		 * entry and overwrite it */
-		void *tmp_pointer = group_cache.res;
-		if(!cache_increment_len(&group_cache.len, &group_cache.size, sizeof(*group_cache.res), &tmp_pointer, &i))
-			goto cleanup;
-		group_cache.res = tmp_pointer;
-
-		res = &group_cache.res[i];
-
-		struct group *copy = malloc(sizeof(*copy));
-		if(!copy) {
-			ret = -1;
-			/* TODO: fix wrong value for len */
-			goto cleanup;
-		}
-		memcpy(copy, g, sizeof(*g));
-
-		res->g = copy;
-	}
-	res->b = b;
-	b = 0;
-	res->t = monotonic_seconds();
-
-cleanup:
-	/* if insertion fails, we should free the buffer */
-	free(b);
-	pthread_rwlock_unlock(&group_cache.lock);
-	return ret;
+	#define BUFFER b
+	#define CACHE group_cache
+	#define RESULT_TYPE group_result
+	#define DATA_TYPE struct group
+	#define COMPARISON() (res->g->gr_gid == g->gr_gid)
+	#define ARGUMENT g
+	#include "cache_add.h"
 }
 
 enum nss_status cache_initgroups_dyn(const char *a, gid_t b, long *c, long *d, gid_t **e, long f, int *err)
