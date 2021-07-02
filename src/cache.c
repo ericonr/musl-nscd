@@ -51,49 +51,20 @@ static struct passwd_cache passwd_cache =
 
 enum nss_status cache_getpwnam_r(const char *name, struct passwd *p, char *buf, size_t buf_len, int *err)
 {
-	IS_CACHING
-	enum nss_status ret = NSS_STATUS_NOTFOUND;
-
-	pthread_rwlock_rdlock(&passwd_cache.lock);
-
-	for(size_t i = 0; i < passwd_cache.len; i++) {
-		struct passwd_result *res = &passwd_cache.res[i];
-		if (strcmp(res->p->pw_name, name) == 0) {
-			if(!validate_timestamp(res->t)) {
-				break;
-			}
-			memcpy(p, passwd_cache.res[i].p, sizeof(*p));
-			ret = NSS_STATUS_SUCCESS;
-			break;
-		}
-	}
-
-	pthread_rwlock_unlock(&passwd_cache.lock);
-	return ret;
+	#define CACHE passwd_cache
+	#define RESULT_TYPE passwd_result
+	#define COMPARISON() (strcmp(res->p->pw_name, name) == 0)
+	#define ARGUMENT p
+	#include "cache_query.h"
 }
 
 enum nss_status cache_getpwuid_r(uid_t id, struct passwd *p, char *buf, size_t buf_len, int *err)
 {
-	IS_CACHING
-
-	enum nss_status ret = NSS_STATUS_NOTFOUND;
-
-	pthread_rwlock_rdlock(&passwd_cache.lock);
-
-	for(size_t i = 0; i < passwd_cache.len; i++) {
-		struct passwd_result *res = &passwd_cache.res[i];
-		if (res->p->pw_uid == id) {
-			if(!validate_timestamp(res->t)) {
-				break;
-			}
-			memcpy(p, passwd_cache.res[i].p, sizeof(*p));
-			ret = NSS_STATUS_SUCCESS;
-			break;
-		}
-	}
-
-	pthread_rwlock_unlock(&passwd_cache.lock);
-	return ret;
+	#define CACHE passwd_cache
+	#define RESULT_TYPE passwd_result
+	#define COMPARISON() (res->p->pw_uid == id)
+	#define ARGUMENT p
+	#include "cache_query.h"
 }
 
 /* increment len and store the index for that new member in index */
@@ -213,50 +184,20 @@ static struct group_cache group_cache =
 
 enum nss_status cache_getgrnam_r(const char *name, struct group *g, char *buf, size_t buf_len, int *err)
 {
-	IS_CACHING
-
-	enum nss_status ret = NSS_STATUS_NOTFOUND;
-
-	pthread_rwlock_rdlock(&group_cache.lock);
-
-	for(size_t i = 0; i < group_cache.len; i++) {
-		struct group_result *res = &group_cache.res[i];
-		if (strcmp(res->g->gr_name, name) == 0) {
-			if(!validate_timestamp(res->t)) {
-				break;
-			}
-			memcpy(g, group_cache.res[i].g, sizeof(*g));
-			ret = NSS_STATUS_SUCCESS;
-			break;
-		}
-	}
-
-	pthread_rwlock_unlock(&group_cache.lock);
-	return ret;
+	#define CACHE group_cache
+	#define RESULT_TYPE group_result
+	#define COMPARISON() (strcmp(res->g->gr_name, name) == 0)
+	#define ARGUMENT g
+	#include "cache_query.h"
 }
 
 enum nss_status cache_getgrgid_r(gid_t id, struct group *g, char *buf, size_t buf_len, int *err)
 {
-	IS_CACHING
-
-	enum nss_status ret = NSS_STATUS_NOTFOUND;
-
-	pthread_rwlock_rdlock(&group_cache.lock);
-
-	for(size_t i = 0; i < group_cache.len; i++) {
-		struct group_result *res = &group_cache.res[i];
-		if (res->g->gr_gid == id) {
-			if(!validate_timestamp(res->t)) {
-				break;
-			}
-			memcpy(g, group_cache.res[i].g, sizeof(*g));
-			ret = NSS_STATUS_SUCCESS;
-			break;
-		}
-	}
-
-	pthread_rwlock_unlock(&group_cache.lock);
-	return ret;
+	#define CACHE group_cache
+	#define RESULT_TYPE group_result
+	#define COMPARISON() (res->g->gr_gid == id)
+	#define ARGUMENT g
+	#include "cache_query.h"
 }
 
 /* this function copies the group struct p points to and
