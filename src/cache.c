@@ -29,9 +29,14 @@ static time_t monotonic_seconds(void)
 	return res.tv_sec;
 }
 
+static bool compare_timestamps(time_t t, time_t now)
+{
+	return (now - t) < CACHE_INVALIDATION_TIME;
+}
+
 static bool validate_timestamp(time_t t)
 {
-	return (monotonic_seconds() - t) < CACHE_INVALIDATION_TIME;
+	return compare_timestamps(t, monotonic_seconds());
 }
 
 struct passwd_result {
