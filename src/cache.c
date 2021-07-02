@@ -96,35 +96,35 @@ enum nss_status cache_getpwuid_r(uid_t id, struct passwd *p, char *buf, size_t b
 	return ret;
 }
 
-/* increment cache->len and store the index for that new member in index */
-bool cache_passwd_increment_len(struct passwd_cache *cache, size_t *index)
+/* increment len and store the index for that new member in index */
+static bool cache_increment_len(size_t *len, size_t *size, size_t sizeof_element, void **data, size_t *index)
 {
 	/* first simply try to increment len */
-	if(cache->len < cache->size) {
-		*index = cache->len++;
+	if(*len < *size) {
+		*index = (*len)++;
 		return true;
 	}
 
 	/* otherwise, try to increase cache size */
 
-	if(cache->size >= CACHE_MAX_ENTRIES)
+	if(*size >= CACHE_MAX_ENTRIES)
 		return false;
 
 	size_t new_size;
 	/* memory growth factor is 1.5x; see socket_handle.c for a similar impl */
-	if(cache->size > CACHE_MAX_ENTRIES - cache->size/2)
+	if(*size > CACHE_MAX_ENTRIES - *size/2)
 		new_size = CACHE_MAX_ENTRIES;
 	else
-		new_size = cache->size + cache->size/2;
+		new_size = *size + *size/2;
 
 	/* XXX: doesn't check for multiplication overflow */
-	void *tmp = realloc(cache->res, new_size * sizeof(*cache->res));
+	void *tmp = realloc(*data, new_size * sizeof_element);
 	if(!tmp)
 		return false;
 
-	cache->size = new_size;
-	cache->res = tmp;
-	*index = cache->len++;
+	*size = new_size;
+	*data = tmp;
+	*index = (*len)++;
 	return true;
 }
 
@@ -169,8 +169,10 @@ int cache_passwd_add(struct passwd *p, char *b)
 	} else {
 		/* TODO: if resizing fails, we can scan the cache for an outdated
 		 * entry and overwrite it */
-		if(!cache_passwd_increment_len(&passwd_cache, &i))
+		void *tmp_pointer = passwd_cache.res;
+		if(!cache_increment_len(&passwd_cache.len, &passwd_cache.size, sizeof(*passwd_cache.res), &tmp_pointer, &i))
 			goto cleanup;
+		passwd_cache.res = tmp_pointer;
 
 		res = &passwd_cache.res[i];
 
