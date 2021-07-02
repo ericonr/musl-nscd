@@ -37,12 +37,9 @@ static bool validate_timestamp(time_t t)
 struct passwd_result {
 	struct passwd *p;
 	char *b;
-	/* deal with validation */
+	/* for validation */
 	time_t t;
-	/* we don't handle cases where the action isn't ACT_RETURN (ACT_CONTINUE and/or ACT_MERGE?);
-	 * these should be dealt with by caching the complete response */
 };
-/* a LRU cache is probably the best option? */
 struct passwd_cache {
 	pthread_rwlock_t lock;
 	struct passwd_result *res;
