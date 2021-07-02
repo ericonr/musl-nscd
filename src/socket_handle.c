@@ -389,22 +389,45 @@ int return_result(int fd, int swap, uint32_t reqtype, void *key)
 				err = write_groups(fd, swap, status == NSS_STATUS_SUCCESS ? res.l.end : 0, status == NSS_STATUS_SUCCESS ? res.l.grps : 0);
 				free(res.l.grps);
 			}
-			if(err == -1) {
-				free(buf);
-				return -1;
-			}
+
 			if(err == -2) {
+				/* the buffer will no longer be used */
+				free(buf);
+				/* we treat an invalid entry as the service being unavailable */
 				if(on_status[STS_UNAVAIL] == ACT_RETURN) {
-					free(buf);
-					if(mod_passwd)
+					if(ISPWREQ(reqtype))
 						return write_pwd(fd, swap, 0) > 0 ? 0 : -1;
-					else if(reqtype != GETINITGR)
+					else if(ISGRPREQ(reqtype))
 						return write_grp(fd, swap, 0) > 0 ? 0 : -1;
 					else
 						return write_groups(fd, swap, 0, 0) > 0 ? 0 : -1;
 				}
+				/* for actions other than ACT_RETURN we will try other modules */
 				continue;
 			}
+
+			/* if the write was successful, we will return 0,
+			 * otherwise, we will return -1 */
+			if(err > 0)
+				err = 0;
+
+			/* this entry wasn't in cache when we tried! */
+			if(!cache_run && status == NSS_STATUS_SUCCESS) {
+				/* we null buf here when it's given to a cache_*_add functions,
+				 * since the cache function takes ownership of it.
+				 * this way, the free() call below will be a no op */
+				if(ISPWREQ(reqtype)) {
+					cache_passwd_add(&res.p, buf);
+					buf = 0;
+				}
+				else if(ISGRPREQ(reqtype)) {}
+				else {}
+			}
+			/* even when all caches are implemented, we have to free(buf)
+			 * for the case when status isn't SUCCESS */
+			free(buf);
+
+			return err;
 		}
 	} while(l);
 	if(!l) {
