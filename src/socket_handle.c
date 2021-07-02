@@ -277,13 +277,10 @@ static enum nss_status nss_getkey(uint32_t reqtype, struct mod_passwd *mod_passw
 
 int return_result(int fd, int swap, uint32_t reqtype, void *key)
 {
-	union {
-		struct passwd p;
-		struct group g;
-		struct initgroups_res l;
-	} res;
 	link_t *l;
+	/* true if using passwd_mods, false if using group_mods */
 	bool using_passwd;
+	/* control whether the initial cache run has happened already */
 	bool cache_run = true;
 
 	if(ISPWREQ(reqtype)) {
@@ -292,6 +289,11 @@ int return_result(int fd, int swap, uint32_t reqtype, void *key)
 		using_passwd = false;
 	}
 	do {
+		union {
+			struct passwd p;
+			struct group g;
+			struct initgroups_res l;
+		} res;
 		int ret = 0;
 		int act;
 		enum nss_status status;
