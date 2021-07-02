@@ -34,13 +34,6 @@ static bool validate_timestamp(time_t t)
 	return (monotonic_seconds() - t) < CACHE_INVALIDATION_TIME;
 }
 
-/* consider coalescing getpw* into a single cache; security considerations? */
-enum nss_status cache_getpwnam_r(const char *a, struct passwd *b, char *c, size_t d, int *err)
-{
-	IS_CACHING
-	return NSS_STATUS_NOTFOUND;
-}
-
 struct passwd_result {
 	struct passwd *p;
 	char *b;
@@ -58,6 +51,30 @@ struct passwd_cache {
 
 static struct passwd_cache passwd_cache =
 	{ .lock = PTHREAD_RWLOCK_INITIALIZER, .size = CACHE_INITIAL_ENTRIES };
+
+enum nss_status cache_getpwnam_r(const char *name, struct passwd *p, char *buf, size_t buf_len, int *err)
+{
+	IS_CACHING
+	enum nss_status ret = NSS_STATUS_NOTFOUND;
+
+	pthread_rwlock_rdlock(&passwd_cache.lock);
+
+	for(size_t i = 0; i < passwd_cache.len; i++) {
+		struct passwd_result *res = &passwd_cache.res[i];
+		if (strcmp(res->p->pw_name, name) == 0) {
+			if(!validate_timestamp(res->t)) {
+				break;
+			}
+			memcpy(p, passwd_cache.res[i].p, sizeof(*p));
+			ret = NSS_STATUS_SUCCESS;
+			break;
+		}
+	}
+
+	pthread_rwlock_unlock(&passwd_cache.lock);
+	return ret;
+}
+
 enum nss_status cache_getpwuid_r(uid_t id, struct passwd *p, char *buf, size_t buf_len, int *err)
 {
 	IS_CACHING
