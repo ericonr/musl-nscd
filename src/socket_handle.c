@@ -212,12 +212,6 @@ end:
 
 }
 
-struct initgroups_res {
-	long end;
-	long alloc;
-	gid_t *grps;
-};
-
 static enum nss_status nss_getkey(uint32_t reqtype, struct mod_passwd *mod_passwd, struct mod_group *mod_group, void *key, void *res, char *buf, size_t n, int *ret)
 {
 	int retval = NSS_STATUS_UNAVAIL;

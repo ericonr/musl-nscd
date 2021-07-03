@@ -41,6 +41,12 @@ enum nss_status cache_getgrgid_r(gid_t, struct group *, char *, size_t, int *);
 enum nss_status cache_initgroups_dyn(const char *, gid_t, long *, long *, gid_t **, long , int *);
 int init_caches(void);
 
+struct initgroups_res {
+	long end;
+	long alloc;
+	gid_t *grps;
+};
+
 int cache_passwd_add(struct passwd *, char *);
 int cache_group_add(struct group *, char *);
 
