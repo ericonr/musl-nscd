@@ -16,7 +16,7 @@ for(size_t i = 0; i < CACHE.len; i++) {
 	}
 }
 
-pthread_rwlock_unlock(&passwd_cache.lock);
+pthread_rwlock_unlock(&CACHE.lock);
 return ret;
 
 /* avoid polluting lines after this file is included */
