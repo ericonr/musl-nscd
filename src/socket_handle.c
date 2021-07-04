@@ -296,8 +296,18 @@ int return_result(int fd, int swap, uint32_t reqtype, void *key)
 		struct mod_passwd *mod_passwd;
 		char *buf = 0;
 		size_t buf_len = 0;
+		/* true during the cache run;
+		 * needs to exist because cache_run is set to false early on */
+		bool using_cache = false;
+
+		/* macro to free the temporary resources allocated by return_result:
+		 * getpw* and getgr* requests use buf,
+		 * while initgroups uses the array in res.l.grps */
+		#define FREE_ALLOC() \
+			do{ if(ISPWREQ(reqtype)||ISGRPREQ(reqtype)) free(buf); else free(res.l.grps); } while(0)
 
 		if (cache_run) {
+			using_cache = true;
 			/* the cache module is the first to run */
 			cache_run = false;
 			mod_passwd = &cache_modp;
@@ -378,6 +388,7 @@ int return_result(int fd, int swap, uint32_t reqtype, void *key)
 			status == NSS_STATUS_UNAVAIL ? STS_UNAVAIL :
 			status == NSS_STATUS_NOTFOUND ? STS_NOTFOUND :
 			STS_SUCCESS];
+
 		if(act == ACT_RETURN) {
 			int err;
 			/* the write_* functions also validate the entry, and will return -2
@@ -388,12 +399,11 @@ int return_result(int fd, int swap, uint32_t reqtype, void *key)
 				err = write_grp(fd, swap, status == NSS_STATUS_SUCCESS ? &res.g : 0);
 			} else {
 				err = write_groups(fd, swap, status == NSS_STATUS_SUCCESS ? res.l.end : 0, status == NSS_STATUS_SUCCESS ? res.l.grps : 0);
-				free(res.l.grps);
 			}
 
 			if(err == -2) {
-				/* the buffer will no longer be used */
-				free(buf);
+				/* the buffers will no longer be used */
+				FREE_ALLOC();
 				/* we treat an invalid entry as the service being unavailable */
 				if(on_status[STS_UNAVAIL] == ACT_RETURN) {
 					if(ISPWREQ(reqtype))
@@ -413,7 +423,7 @@ int return_result(int fd, int swap, uint32_t reqtype, void *key)
 				err = 0;
 
 			/* this entry wasn't in cache when we tried! */
-			if(!cache_run && status == NSS_STATUS_SUCCESS) {
+			if(!using_cache && status == NSS_STATUS_SUCCESS) {
 				/* we null buf here when it's given to a cache_*_add functions,
 				 * since the cache function takes ownership of it.
 				 * this way, the free() call below will be a no op */
@@ -427,12 +437,14 @@ int return_result(int fd, int swap, uint32_t reqtype, void *key)
 				}
 				else {}
 			}
-			/* even when all caches are implemented, we have to free(buf)
-			 * for the case when status isn't SUCCESS */
-			free(buf);
+			/* we have to free resources for the case when status isn't SUCCESS */
+			FREE_ALLOC();
 
 			return err;
 		}
+
+		/* we have to free resources for the case when action isn't RETURN */
+		FREE_ALLOC();
 	} while(l);
 
 	/* if everything else errored out, we send an empty message */
