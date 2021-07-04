@@ -178,8 +178,9 @@ struct mod_group cache_modg =
 
 int init_caches(void)
 {
-	if(!(passwd_cache.res = malloc(passwd_cache.size * sizeof(*passwd_cache.res)))) return -1;
-	if(!(group_cache.res = malloc(group_cache.size * sizeof(*group_cache.res)))) return -1;
+	#define MALLOC_CACHE(cache) do{ if(!(cache.res = malloc(cache.size * sizeof(*cache.res)))) return -1; }while(0)
+	MALLOC_CACHE(passwd_cache);
+	MALLOC_CACHE(group_cache);
 
 	cache = 1;
 	return 0;
