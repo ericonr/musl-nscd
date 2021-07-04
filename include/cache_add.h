@@ -60,9 +60,9 @@ b = 0;
 res->t = monotonic_seconds();
 
 cleanup:
+pthread_rwlock_unlock(&CACHE.lock);
 /* if insertion fails, we should free the buffer */
 free(b);
-pthread_rwlock_unlock(&CACHE.lock);
 return ret;
 
 #undef BUFFER
