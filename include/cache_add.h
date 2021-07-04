@@ -50,37 +50,27 @@ struct RESULT_TYPE *res;
 if(found_outdated) {
 	res = &CACHE.res[i];
 
-	/* we can re-use the cache entry's passwd struct */
-	memcpy(res->ARGUMENT, ARGUMENT, sizeof(*ARGUMENT));
+	/* we will simply overwrite the cache entry's ARGUMENT member */
+	memcpy(&res->ARGUMENT, ARGUMENT, sizeof(*ARGUMENT));
 	/* but we still need to free its underlying storage */
 	free(res->b);
 } else {
 	if(found_invalid) {
 		/* overwrite invalid entry */
 		i = oldest_i;
-		/* we need to free all the underlying storage, but res->ARGUMENT will be
-		 * reused */
+		/* we need to free all the underlying storage */
 		res = &CACHE.res[i];
 		free(res->b);
 	} else {
-		DATA_TYPE *copy = malloc(sizeof(*copy));
-		if(!copy) {
-			ret = -1;
-			goto cleanup;
-		}
-
 		void *tmp_pointer = CACHE.res;
-		if(!cache_increment_len(&CACHE.len, &CACHE.size, sizeof(*CACHE.res), &tmp_pointer, &i)) {
-			free(copy);
+		if(!cache_increment_len(&CACHE.len, &CACHE.size, sizeof(*CACHE.res), &tmp_pointer, &i))
 			goto cleanup;
-		}
 		CACHE.res = tmp_pointer;
 
 		res = &CACHE.res[i];
-		res->ARGUMENT = copy;
 	}
 
-	memcpy(res->ARGUMENT, ARGUMENT, sizeof(*ARGUMENT));
+	memcpy(&res->ARGUMENT, ARGUMENT, sizeof(*ARGUMENT));
 }
 res->b = b;
 b = 0;
@@ -95,6 +85,5 @@ return ret;
 #undef BUFFER
 #undef CACHE
 #undef RESULT_TYPE
-#undef DATA_TYPE
 #undef COMPARISON
 #undef ARGUMENT

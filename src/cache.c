@@ -73,7 +73,7 @@ static bool cache_increment_len(size_t *len, size_t *size, size_t sizeof_element
 }
 
 struct passwd_result {
-	struct passwd *p;
+	struct passwd p;
 	char *b;
 	/* for validation */
 	time_t t;
@@ -91,7 +91,7 @@ enum nss_status cache_getpwnam_r(const char *name, struct passwd *p, char *buf, 
 {
 	#define CACHE passwd_cache
 	#define RESULT_TYPE passwd_result
-	#define COMPARISON() (strcmp(res->p->pw_name, name) == 0)
+	#define COMPARISON() (strcmp(res->p.pw_name, name) == 0)
 	#define ARGUMENT p
 	#include "cache_query.h"
 }
@@ -100,7 +100,7 @@ enum nss_status cache_getpwuid_r(uid_t id, struct passwd *p, char *buf, size_t b
 {
 	#define CACHE passwd_cache
 	#define RESULT_TYPE passwd_result
-	#define COMPARISON() (res->p->pw_uid == id)
+	#define COMPARISON() (res->p.pw_uid == id)
 	#define ARGUMENT p
 	#include "cache_query.h"
 }
@@ -112,14 +112,13 @@ int cache_passwd_add(struct passwd *p, char *b)
 	#define BUFFER b
 	#define CACHE passwd_cache
 	#define RESULT_TYPE passwd_result
-	#define DATA_TYPE struct passwd
-	#define COMPARISON() (res->p->pw_uid == p->pw_uid)
+	#define COMPARISON() (res->p.pw_uid == p->pw_uid)
 	#define ARGUMENT p
 	#include "cache_add.h"
 }
 
 struct group_result {
-	struct group *g;
+	struct group g;
 	char *b;
 	/* for validation */
 	time_t t;
@@ -137,7 +136,7 @@ enum nss_status cache_getgrnam_r(const char *name, struct group *g, char *buf, s
 {
 	#define CACHE group_cache
 	#define RESULT_TYPE group_result
-	#define COMPARISON() (strcmp(res->g->gr_name, name) == 0)
+	#define COMPARISON() (strcmp(res->g.gr_name, name) == 0)
 	#define ARGUMENT g
 	#include "cache_query.h"
 }
@@ -146,7 +145,7 @@ enum nss_status cache_getgrgid_r(gid_t id, struct group *g, char *buf, size_t bu
 {
 	#define CACHE group_cache
 	#define RESULT_TYPE group_result
-	#define COMPARISON() (res->g->gr_gid == id)
+	#define COMPARISON() (res->g.gr_gid == id)
 	#define ARGUMENT g
 	#include "cache_query.h"
 }
@@ -158,8 +157,7 @@ int cache_group_add(struct group *g, char *b)
 	#define BUFFER b
 	#define CACHE group_cache
 	#define RESULT_TYPE group_result
-	#define DATA_TYPE struct group
-	#define COMPARISON() (res->g->gr_gid == g->gr_gid)
+	#define COMPARISON() (res->g.gr_gid == g->gr_gid)
 	#define ARGUMENT g
 	#include "cache_add.h"
 }

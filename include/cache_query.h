@@ -10,7 +10,7 @@ for(size_t i = 0; i < CACHE.len; i++) {
 		if(!validate_timestamp(res->t)) {
 			break;
 		}
-		memcpy(ARGUMENT, CACHE.res[i].ARGUMENT, sizeof(*ARGUMENT));
+		memcpy(ARGUMENT, &CACHE.res[i].ARGUMENT, sizeof(*ARGUMENT));
 		ret = NSS_STATUS_SUCCESS;
 		break;
 	}
