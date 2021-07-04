@@ -8,16 +8,35 @@ bool found_outdated = false;
 /* studying the effects of contention on this lock might be important */
 pthread_rwlock_wrlock(&CACHE.lock);
 
+/* since we can't initialize oldest to the maximum value of time_t, because it
+ * doesn't exist, initialize it with the first entry (if there is a first entry
+ * at all) */
+time_t oldest = CACHE.len > 0 ? CACHE.res[0].t : 0;
+size_t oldest_i = 0;
+bool found_invalid = false;
+
 /* TODO: store the index for the oldest entry, use it if we don't replace
  * an old one of our own */
 
 /* check if the new value hasn't been added by another thread */
+time_t now = monotonic_seconds();
 for(i = 0; i < CACHE.len; i++) {
 	struct RESULT_TYPE *res = &CACHE.res[i];
+
+	/* look for invalid entry with lowest timestamp as a heuristic for
+	 * least-recently-used */
+	if(!compare_timestamps(res->t, now)) {
+		found_invalid = true;
+		if(res->t < oldest) {
+			oldest = res->t;
+			oldest_i = i;
+		}
+	}
+
 	/* since the ID is canonical, we only need to look for it to check for duplicates */
 	if (COMPARISON()) {
 		/* valid entry */
-		if(validate_timestamp(res->t)) {
+		if(compare_timestamps(res->t, now)) {
 			goto cleanup;
 		}
 		/* outdated entry, should be replaced */
@@ -27,7 +46,7 @@ for(i = 0; i < CACHE.len; i++) {
 }
 
 /* if we are here, we are necessarily going to add something to the cache */
-struct RESULT_TYPE *res;;
+struct RESULT_TYPE *res;
 if(found_outdated) {
 	res = &CACHE.res[i];
 
@@ -36,28 +55,36 @@ if(found_outdated) {
 	/* but we still need to free its underlying storage */
 	free(res->b);
 } else {
-	/* TODO: if resizing fails, we can scan the cache for an outdated
-	 * entry and overwrite it */
-	void *tmp_pointer = CACHE.res;
-	if(!cache_increment_len(&CACHE.len, &CACHE.size, sizeof(*CACHE.res), &tmp_pointer, &i))
-		goto cleanup;
-	CACHE.res = tmp_pointer;
+	if(found_invalid) {
+		/* overwrite invalid entry */
+		i = oldest_i;
+		/* we need to free all the underlying storage, but res->ARGUMENT will be
+		 * reused */
+		res = &CACHE.res[i];
+		free(res->b);
+	} else {
+		DATA_TYPE *copy = malloc(sizeof(*copy));
+		if(!copy) {
+			ret = -1;
+			goto cleanup;
+		}
 
-	res = &CACHE.res[i];
+		void *tmp_pointer = CACHE.res;
+		if(!cache_increment_len(&CACHE.len, &CACHE.size, sizeof(*CACHE.res), &tmp_pointer, &i)) {
+			free(copy);
+			goto cleanup;
+		}
+		CACHE.res = tmp_pointer;
 
-	DATA_TYPE *copy = malloc(sizeof(*copy));
-	if(!copy) {
-		/* TODO: fix wrong value for len if allocation fails */
-		ret = -1;
-		goto cleanup;
+		res = &CACHE.res[i];
+		res->ARGUMENT = copy;
 	}
-	memcpy(copy, ARGUMENT, sizeof(*ARGUMENT));
 
-	res->ARGUMENT = copy;
+	memcpy(res->ARGUMENT, ARGUMENT, sizeof(*ARGUMENT));
 }
 res->b = b;
 b = 0;
-res->t = monotonic_seconds();
+res->t = now;
 
 cleanup:
 pthread_rwlock_unlock(&CACHE.lock);

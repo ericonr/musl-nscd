@@ -232,10 +232,24 @@ int cache_initgroups_add(struct initgroups_res *g, const char *name)
 
 	pthread_rwlock_wrlock(&initgroups_cache.lock);
 
+	time_t oldest = initgroups_cache.len > 0 ? initgroups_cache.res[0].t : 0;
+	size_t oldest_i = 0;
+	bool found_invalid = false;
+
+	time_t now = monotonic_seconds();
 	for(i = 0; i < initgroups_cache.len; i++) {
 		struct initgroups_result *res = &initgroups_cache.res[i];
+
+		if(!compare_timestamps(res->t, now)) {
+			found_invalid = true;
+			if(res->t < oldest) {
+				oldest = res->t;
+				oldest_i = i;
+			}
+		}
+
 		if (strcmp(res->name, name) == 0) {
-			if(validate_timestamp(res->t)) {
+			if(compare_timestamps(res->t, now)) {
 				goto cleanup;
 			}
 			found_outdated = true;
@@ -247,25 +261,34 @@ int cache_initgroups_add(struct initgroups_res *g, const char *name)
 	struct initgroups_result *res;
 	if(found_outdated) {
 		res = &initgroups_cache.res[i];
-		/* we need to free the underlying storage */
+		/* we need to free the underlying storage, but we reuse res->name */
 		free(res->g.grps);
 	} else {
 		char *namedup = strdup(name);
 		if (!namedup)
 			goto cleanup;
 
-		void *tmp_pointer = initgroups_cache.res;
-		if(!cache_increment_len(&initgroups_cache.len, &initgroups_cache.size, sizeof(*initgroups_cache.res), &tmp_pointer, &i)) {
-			free(namedup);
-			goto cleanup;
+		if(found_invalid) {
+			/* overwrite invalid entry */
+			i = oldest_i;
+			res = &initgroups_cache.res[i];
+			/* we need to free all the underlying storage */
+			free(res->name);
+			free(res->g.grps);
+		} else {
+			void *tmp_pointer = initgroups_cache.res;
+			if(!cache_increment_len(&initgroups_cache.len, &initgroups_cache.size, sizeof(*initgroups_cache.res), &tmp_pointer, &i)) {
+				free(namedup);
+				goto cleanup;
+			}
+			initgroups_cache.res = tmp_pointer;
 		}
-		initgroups_cache.res = tmp_pointer;
 
 		res = &initgroups_cache.res[i];
 		res->name = namedup;
 	}
 	memcpy(&res->g, g, sizeof(*g));
-	res->t = monotonic_seconds();
+	res->t = now;
 	g->grps = 0;
 
 cleanup:
