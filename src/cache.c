@@ -35,6 +35,7 @@ static bool compare_timestamps(time_t t, time_t now)
 	return (now - t) < CACHE_INVALIDATION_TIME;
 }
 
+/* returns true if the timestamp is still valid */
 static bool validate_timestamp(time_t t)
 {
 	return compare_timestamps(t, monotonic_seconds());
@@ -220,6 +221,7 @@ enum nss_status cache_initgroups_dyn(const char *name, gid_t id, long *end, long
 	return ret;
 }
 
+/* see cache_add.h for comments on the implementation strategy */
 int cache_initgroups_add(struct initgroups_res *g, const char *name)
 {
 	IS_CACHING_FOR_WRITE(g->grps);
