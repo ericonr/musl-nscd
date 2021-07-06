@@ -70,6 +70,7 @@ if(found_outdated) {
 	memcpy(&res->ARGUMENT, ARGUMENT, sizeof(*ARGUMENT));
 }
 res->b = b;
+res->l = buf_len;
 res->t = now;
 b = 0;
 

@@ -41,8 +41,8 @@ struct initgroups_res {
 };
 
 int init_caches(void);
-int cache_passwd_add(struct passwd *, char *);
-int cache_group_add(struct group *, char *);
+int cache_passwd_add(struct passwd *, char *, size_t);
+int cache_group_add(struct group *, char *, size_t);
 int cache_initgroups_add(struct initgroups_res *, const char *);
 
 #endif

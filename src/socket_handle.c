@@ -319,6 +319,8 @@ int return_result(int fd, int swap, uint32_t reqtype, void *key)
 			} else {
 				l = list_head(&group_mods);
 			}
+
+			buf = (void *)&buf;
 		} else {
 			/* all iterations after the first one will run the code here */
 			if(using_passwd) {
@@ -381,6 +383,7 @@ int return_result(int fd, int swap, uint32_t reqtype, void *key)
 				buf_len = new_len;
 			}
 		} while(status == NSS_STATUS_TRYAGAIN && ret == ERANGE);
+		if(buf == (void *)&buf) buf = 0;
 
 		on_status = using_passwd ? mod_passwd->on_status : mod_group->on_status;
 		act = on_status[
@@ -428,10 +431,10 @@ int return_result(int fd, int swap, uint32_t reqtype, void *key)
 				 * since the cache function takes ownership of it.
 				 * this way, the free() call below will be a no op */
 				if(ISPWREQ(reqtype)) {
-					cache_passwd_add(&res.p, buf);
+					cache_passwd_add(&res.p, buf, buf_len);
 					buf = 0;
 				} else if(ISGRPREQ(reqtype)) {
-					cache_group_add(&res.g, buf);
+					cache_group_add(&res.g, buf, buf_len);
 					buf = 0;
 				} else {
 					cache_initgroups_add(&res.l, key);

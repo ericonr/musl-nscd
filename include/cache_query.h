@@ -10,7 +10,13 @@ for(size_t i = 0; i < CACHE.len; i++) {
 		if(!validate_timestamp(res->t)) {
 			break;
 		}
-		memcpy(ARGUMENT, &CACHE.res[i].ARGUMENT, sizeof(*ARGUMENT));
+		char **new_buf = (void *)buf;
+		*new_buf = malloc(res->l);
+		if(!*new_buf) {
+			*err = errno;
+			break;
+		}
+		COPY_FUNCTION(ARGUMENT, *new_buf, &CACHE.res[i].ARGUMENT, CACHE.res[i].b, res->l);
 		ret = NSS_STATUS_SUCCESS;
 		break;
 	}
@@ -24,3 +30,4 @@ return ret;
 #undef RESULT_TYPE
 #undef COMPARISON
 #undef ARGUMENT
+#undef COPY_FUNCTION

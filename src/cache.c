@@ -5,6 +5,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "config.h"
 #include "modules.h"
 
 static int cache = 0;
@@ -76,6 +77,7 @@ static bool cache_increment_len(size_t *len, size_t *size, size_t sizeof_element
 struct passwd_result {
 	struct passwd p;
 	char *b;
+	size_t l;
 	/* for validation */
 	time_t t;
 };
@@ -88,12 +90,32 @@ struct passwd_cache {
 static struct passwd_cache passwd_cache =
 	{ .lock = PTHREAD_RWLOCK_INITIALIZER, .size = CACHE_INITIAL_ENTRIES };
 
+static void copy_passwd(struct passwd *np, char *nb, const struct passwd *p, const char *b, size_t len)
+{
+	memcpy(nb, b, len);
+
+	#define NEW_ADDRESS(member) np->member = p->member ? nb + (p->member - b) : 0
+	NEW_ADDRESS(pw_name);
+#ifdef HAVE_PW_PASSWD
+	NEW_ADDRESS(pw_passwd);
+#endif
+	np->pw_uid = p->pw_uid;
+	np->pw_gid = p->pw_gid;
+#ifdef HAVE_PW_GECOS
+	NEW_ADDRESS(pw_gecos);
+#endif
+	NEW_ADDRESS(pw_dir);
+	NEW_ADDRESS(pw_shell);
+	#undef NEW_ADDRESS
+}
+
 enum nss_status cache_getpwnam_r(const char *name, struct passwd *p, char *buf, size_t buf_len, int *err)
 {
 	#define CACHE passwd_cache
 	#define RESULT_TYPE passwd_result
 	#define COMPARISON() (strcmp(res->p.pw_name, name) == 0)
 	#define ARGUMENT p
+	#define COPY_FUNCTION copy_passwd
 	#include "cache_query.h"
 }
 
@@ -103,12 +125,13 @@ enum nss_status cache_getpwuid_r(uid_t id, struct passwd *p, char *buf, size_t b
 	#define RESULT_TYPE passwd_result
 	#define COMPARISON() (res->p.pw_uid == id)
 	#define ARGUMENT p
+	#define COPY_FUNCTION copy_passwd
 	#include "cache_query.h"
 }
 
 /* this function copies the passwd struct p points to and
  * takes ownership of the buffer b points to */
-int cache_passwd_add(struct passwd *p, char *b)
+int cache_passwd_add(struct passwd *p, char *b, size_t buf_len)
 {
 	#define BUFFER b
 	#define CACHE passwd_cache
@@ -121,6 +144,7 @@ int cache_passwd_add(struct passwd *p, char *b)
 struct group_result {
 	struct group g;
 	char *b;
+	size_t l;
 	/* for validation */
 	time_t t;
 };
@@ -133,12 +157,35 @@ struct group_cache {
 static struct group_cache group_cache =
 	{ .lock = PTHREAD_RWLOCK_INITIALIZER, .size = CACHE_INITIAL_ENTRIES };
 
+static void copy_group(struct group *ng, char *nb, const struct group *g, const char *b, size_t len)
+{
+	memcpy(nb, b, len);
+
+	/* copy the pointer offset */
+	#define NEW_ADDRESS(member) ng->member = g->member ? (void *)(nb + ((char *)(void *)g->member - (char *)(void *)b)) : 0
+	NEW_ADDRESS(gr_name);
+#ifdef HAVE_GR_PASSWD
+	NEW_ADDRESS(gr_passwd);
+#endif
+	ng->gr_gid = g->gr_gid;
+
+	NEW_ADDRESS(gr_mem);
+	if(g->gr_mem) {
+		for(size_t i = 0; g->gr_mem[i]; i++) {
+			NEW_ADDRESS(gr_mem[i]);
+		}
+	}
+
+	#undef NEW_ADDRESS
+}
+
 enum nss_status cache_getgrnam_r(const char *name, struct group *g, char *buf, size_t buf_len, int *err)
 {
 	#define CACHE group_cache
 	#define RESULT_TYPE group_result
 	#define COMPARISON() (strcmp(res->g.gr_name, name) == 0)
 	#define ARGUMENT g
+	#define COPY_FUNCTION copy_group
 	#include "cache_query.h"
 }
 
@@ -148,12 +195,13 @@ enum nss_status cache_getgrgid_r(gid_t id, struct group *g, char *buf, size_t bu
 	#define RESULT_TYPE group_result
 	#define COMPARISON() (res->g.gr_gid == id)
 	#define ARGUMENT g
+	#define COPY_FUNCTION copy_group
 	#include "cache_query.h"
 }
 
 /* this function copies the group struct p points to and
  * takes ownership of the buffer b points to */
-int cache_group_add(struct group *g, char *b)
+int cache_group_add(struct group *g, char *b, size_t buf_len)
 {
 	#define BUFFER b
 	#define CACHE group_cache
