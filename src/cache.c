@@ -109,7 +109,7 @@ static void copy_passwd(struct passwd *np, char *nb, const struct passwd *p, con
 	#undef NEW_ADDRESS
 }
 
-enum nss_status cache_getpwnam_r(const char *name, struct passwd *p, char *buf, size_t buf_len, int *err)
+enum nss_status cache_getpwnam_r(const char *name, struct passwd *p, char **buf, int *err)
 {
 	#define CACHE passwd_cache
 	#define RESULT_TYPE passwd_result
@@ -119,7 +119,7 @@ enum nss_status cache_getpwnam_r(const char *name, struct passwd *p, char *buf, 
 	#include "cache_query.h"
 }
 
-enum nss_status cache_getpwuid_r(uid_t id, struct passwd *p, char *buf, size_t buf_len, int *err)
+enum nss_status cache_getpwuid_r(uid_t id, struct passwd *p, char **buf, int *err)
 {
 	#define CACHE passwd_cache
 	#define RESULT_TYPE passwd_result
@@ -179,7 +179,7 @@ static void copy_group(struct group *ng, char *nb, const struct group *g, const 
 	#undef NEW_ADDRESS
 }
 
-enum nss_status cache_getgrnam_r(const char *name, struct group *g, char *buf, size_t buf_len, int *err)
+enum nss_status cache_getgrnam_r(const char *name, struct group *g, char **buf, int *err)
 {
 	#define CACHE group_cache
 	#define RESULT_TYPE group_result
@@ -189,7 +189,7 @@ enum nss_status cache_getgrnam_r(const char *name, struct group *g, char *buf, s
 	#include "cache_query.h"
 }
 
-enum nss_status cache_getgrgid_r(gid_t id, struct group *g, char *buf, size_t buf_len, int *err)
+enum nss_status cache_getgrgid_r(gid_t id, struct group *g, char **buf, int *err)
 {
 	#define CACHE group_cache
 	#define RESULT_TYPE group_result
@@ -226,7 +226,7 @@ struct initgroups_cache {
 static struct initgroups_cache initgroups_cache =
 	{ .lock = PTHREAD_RWLOCK_INITIALIZER, .size = CACHE_INITIAL_ENTRIES };
 
-enum nss_status cache_initgroups_dyn(const char *name, gid_t id, long *end, long *alloc, gid_t **grps, long maxn, int *err)
+enum nss_status cache_initgroups_dyn(const char *name, struct initgroups_res *resp, int *err)
 {
 	IS_CACHING
 
@@ -241,25 +241,14 @@ enum nss_status cache_initgroups_dyn(const char *name, gid_t id, long *end, long
 				break;
 			}
 
-			/* to simplify memory management, we use either the provided buffer or
-			 * realloc a new one. It would be ideal to use the cache buffer without
-			 * copying or allocating memory, but that significantly complicates
-			 * the return_result code */
-
-			if(res->g.end > *alloc) {
-				void *tmp = realloc(*grps, res->g.end * sizeof(gid_t));
-				/* allow a fallback to NOTFOUND, though it's unlikely that the nss
-				 * backend will succeed in the allocation either */
-				if(!tmp) {
-					*err = ENOMEM;
-					break;
-				}
-
-				*alloc = res->g.end;
-				*grps = tmp;
+			resp->grps = malloc(res->g.end * sizeof(gid_t));
+			if(!resp->grps) {
+				*err = errno;
+				break;
 			}
-			*end = res->g.end;
-			memcpy(*grps, res->g.grps, res->g.end * sizeof(gid_t));
+			resp->alloc = resp->end = res->g.end;
+
+			memcpy(resp->grps, res->g.grps, res->g.end * sizeof(gid_t));
 			ret = NSS_STATUS_SUCCESS;
 			break;
 		}
@@ -345,13 +334,6 @@ cleanup:
 	free(g->grps);
 	return ret;
 }
-
-#define CACHE_ON_STATUS {ACT_RETURN, ACT_CONTINUE, ACT_CONTINUE, ACT_CONTINUE}
-struct mod_passwd cache_modp =
-	{ .nss_getpwnam_r = cache_getpwnam_r, .nss_getpwuid_r = cache_getpwuid_r, .on_status = CACHE_ON_STATUS };
-struct mod_group cache_modg =
-	{ .nss_getgrnam_r = cache_getgrnam_r, .nss_getgrgid_r = cache_getgrgid_r,
-	  .nss_initgroups_dyn = cache_initgroups_dyn, .on_status = CACHE_ON_STATUS };
 
 int init_caches(void)
 {
