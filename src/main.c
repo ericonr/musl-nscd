@@ -78,13 +78,14 @@ int main(int argc, char **argv)
 	char *config_path = "/etc/nsswitch.conf";
 	char *pid_path = 0;
 	bool daemonize = false, cache = false;
+	unsigned jobs = 0;
 	int c;
 
 	signal(SIGPIPE, SIG_IGN);
 
 	init_program_invocation_name(argv[0]);
 
-	while((c = getopt(argc, argv, "c:s:p:dC")) != -1) switch(c) {
+	while((c = getopt(argc, argv, "c:s:p:j:dC")) != -1) switch(c) {
 	case 'c':
 		config_path = optarg;
 		break;
@@ -93,6 +94,13 @@ int main(int argc, char **argv)
 		break;
 	case 'p':
 		pid_path = optarg;
+		break;
+	case 'j':
+		errno = 0;
+		jobs = strtoul(optarg, NULL, 10);
+		if(errno) {
+			die_fmt("invalid jobs parameter", optarg);
+		}
 		break;
 	case 'd':
 		daemonize = true;
@@ -120,7 +128,7 @@ int main(int argc, char **argv)
 		if(init_caches()) die();
 	}
 
-	if (init_socket_handling() < 0) die();
+	if (init_socket_handling(jobs) < 0) die();
 
 	entry_l = list_head(&parsed_output);
 	while(entry_l) {
