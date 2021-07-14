@@ -120,6 +120,8 @@ int main(int argc, char **argv)
 		if(init_caches()) die();
 	}
 
+	if (init_socket_handling() < 0) die();
+
 	entry_l = list_head(&parsed_output);
 	while(entry_l) {
 		struct entry *entry = list_ref(entry_l, struct entry, link);
@@ -246,6 +248,5 @@ int main(int argc, char **argv)
 
 	chdir("/");
 
-	if (init_socket_handling() < 0) die();
 	socket_handle(fd, -1, l, 0);
 }
